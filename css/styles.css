@@ -125,11 +125,16 @@ html, body {
     align-items: center;
     justify-content: center;
     background: #000;
+    /* Disable transitions during gameplay to save GPU cycles */
+    transition: none !important;
 }
 
 #game-canvas {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
+    /* GPU layer promotion — prevents compositor from re-rasterizing each frame */
+    will-change: transform;
+    transform: translateZ(0);
 }
 
 #pause-overlay {

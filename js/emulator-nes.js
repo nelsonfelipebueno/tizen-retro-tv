@@ -9,8 +9,12 @@ var EmulatorNES = (function() {
     var frameBuf8 = null;
     var audioCtx = null;
     var scriptNode = null;
-    var audioBufferLeft = [];
-    var audioBufferRight = [];
+    // Ring buffer for audio - avoids O(n) Array.shift() calls
+    var audioRingLeft = null;
+    var audioRingRight = null;
+    var audioWritePos = 0;
+    var audioReadPos = 0;
+    var audioRingSize = 32768;
     var animFrameId = null;
     var isRunning = false;
     var romName = '';
@@ -67,39 +71,51 @@ var EmulatorNES = (function() {
 
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         scriptNode = audioCtx.createScriptProcessor(2048, 0, 2);
-        audioBufferLeft = [];
-        audioBufferRight = [];
+
+        // Initialize ring buffers (Float32Array for zero-GC audio)
+        audioRingLeft = new Float32Array(audioRingSize);
+        audioRingRight = new Float32Array(audioRingSize);
+        audioWritePos = 0;
+        audioReadPos = 0;
 
         scriptNode.onaudioprocess = function(e) {
             var outL = e.outputBuffer.getChannelData(0);
             var outR = e.outputBuffer.getChannelData(1);
-            for (var i = 0; i < outL.length; i++) {
-                if (audioBufferLeft.length > 0) {
-                    outL[i] = audioBufferLeft.shift();
-                    outR[i] = audioBufferRight.shift();
+            var len = outL.length;
+            var rp = audioReadPos;
+            var wp = audioWritePos;
+            var mask = audioRingSize - 1;
+            for (var i = 0; i < len; i++) {
+                if (rp !== wp) {
+                    outL[i] = audioRingLeft[rp & mask];
+                    outR[i] = audioRingRight[rp & mask];
+                    rp = (rp + 1) & mask;
                 } else {
                     outL[i] = 0;
                     outR[i] = 0;
                 }
             }
+            audioReadPos = rp;
         };
         scriptNode.connect(audioCtx.destination);
 
+        var pixelCount = 256 * 240;
+
         nes = new jsnes.NES({
             onFrame: function(buffer) {
-                for (var i = 0; i < 256 * 240; i++) {
-                    frameBuf32[i] = 0xFF000000 | buffer[i];
+                var fb32 = frameBuf32;
+                for (var i = 0; i < pixelCount; i++) {
+                    fb32[i] = 0xFF000000 | buffer[i];
                 }
                 imageData.data.set(frameBuf8);
                 ctx.putImageData(imageData, 0, 0);
             },
             onAudioSample: function(left, right) {
-                audioBufferLeft.push(left);
-                audioBufferRight.push(right);
-                if (audioBufferLeft.length > 16384) {
-                    audioBufferLeft.splice(0, 8192);
-                    audioBufferRight.splice(0, 8192);
-                }
+                var mask = audioRingSize - 1;
+                var wp = audioWritePos;
+                audioRingLeft[wp & mask] = left;
+                audioRingRight[wp & mask] = right;
+                audioWritePos = (wp + 1) & mask;
             },
             emulateSound: true,
             sampleRate: audioCtx.sampleRate
