@@ -15,6 +15,6 @@
     <tizen:privilege name="http://tizen.org/privilege/externalstorage"/>
     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
     <feature name="http://tizen.org/feature/screen.size.all"/>
-    <tizen:profile name="tv"/>
+    <tizen:profile name="tv-samsung"/>
     <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable"/>
 </widget>
