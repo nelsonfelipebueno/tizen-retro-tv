@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro TV</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Menu Screen -->
+    <div id="menu-screen" class="screen active">
+        <h1>RETRO TV</h1>
+        <div class="system-cards">
+            <div class="system-card selected" data-system="snes">
+                <span class="system-name">SNES</span>
+                <span class="system-desc">Super Nintendo</span>
+            </div>
+            <div class="system-card" data-system="nes">
+                <span class="system-name">NES</span>
+                <span class="system-desc">Nintendo</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ROM List Screen -->
+    <div id="romlist-screen" class="screen">
+        <h2 id="romlist-title">SNES ROMs</h2>
+        <ul class="rom-list" id="rom-list"></ul>
+        <input type="file" id="file-input" accept=".smc,.sfc,.fig,.nes,.zip" style="display:none">
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="screen">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading ROM...</div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen">
+        <canvas id="game-canvas"></canvas>
+        <div id="pause-overlay">
+            <h2>PAUSED</h2>
+            <div class="pause-item selected" data-action="resume">Resume</div>
+            <div class="pause-item" data-action="reset">Reset</div>
+            <div class="pause-item" data-action="save1">Save State 1</div>
+            <div class="pause-item" data-action="save2">Save State 2</div>
+            <div class="pause-item" data-action="save3">Save State 3</div>
+            <div class="pause-item" data-action="load1">Load State 1</div>
+            <div class="pause-item" data-action="load2">Load State 2</div>
+            <div class="pause-item" data-action="load3">Load State 3</div>
+            <div class="pause-item" data-action="quit">Back to Menu</div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- globalThis polyfill for Chromium 69 -->
+    <script>if(typeof globalThis==='undefined'){window.globalThis=window;}</script>
+
+    <!-- Libraries -->
+    <script src="lib/fflate.min.js"></script>
+
+    <!-- App scripts -->
+    <script src="js/ui.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/rom-loader.js"></script>
+    <script src="js/save-manager.js"></script>
+    <script src="js/emulator-snes.js"></script>
+    <script src="js/emulator-nes.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
