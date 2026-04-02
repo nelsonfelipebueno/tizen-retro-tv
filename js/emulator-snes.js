@@ -73,6 +73,11 @@ var EmulatorSNES = (function() {
         try {
             Module._run();
             isRunning = true;
+            // Enable frameskip on Tizen TVs for better performance
+            // Frameskip 1 = render every other frame (30fps visual, full-speed logic)
+            if (window.tizen) {
+                setFrameskip(1);
+            }
         } catch(e) {
             console.error('Failed to start SNES emulation:', e);
         }

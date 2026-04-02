@@ -51,14 +51,71 @@ var Input = (function() {
         4: BUTTONS.L,
         5: BUTTONS.R,
         8: BUTTONS.SELECT,
-        9: BUTTONS.START
+        9: BUTTONS.START,
+        // D-pad buttons (PlayStation controllers and many others report D-pad as buttons 12-15)
+        12: BUTTONS.UP,
+        13: BUTTONS.DOWN,
+        14: BUTTONS.LEFT,
+        15: BUTTONS.RIGHT
     };
+
+    // Alternative mapping for PlayStation controllers where Cross=0, Circle=1
+    // On some Tizen/Samsung TV Bluetooth stacks, PS buttons may shift
+    var psAlternateMap = {
+        0: BUTTONS.B,       // Cross → B (confirm in Nintendo layout)
+        1: BUTTONS.A,       // Circle → A
+        2: BUTTONS.Y,       // Square → Y
+        3: BUTTONS.X,       // Triangle → X
+        4: BUTTONS.L,
+        5: BUTTONS.R,
+        8: BUTTONS.SELECT,  // Share
+        9: BUTTONS.START,   // Options
+        12: BUTTONS.UP,
+        13: BUTTONS.DOWN,
+        14: BUTTONS.LEFT,
+        15: BUTTONS.RIGHT,
+        // Some PS controllers map L2/R2 as buttons 6/7, touchpad as 17
+        16: BUTTONS.START   // PS button fallback
+    };
+
+    var activeGamepadMap = gamepadMap;
+    var detectedGamepadType = null;
+
+    function detectGamepadType(gp) {
+        if (detectedGamepadType) return;
+        var id = (gp.id || '').toLowerCase();
+        if (id.indexOf('playstation') !== -1 || id.indexOf('dualshock') !== -1 ||
+            id.indexOf('dualsense') !== -1 || id.indexOf('054c') !== -1 ||
+            id.indexOf('ps3') !== -1 || id.indexOf('ps4') !== -1 || id.indexOf('ps5') !== -1 ||
+            id.indexOf('sony') !== -1 || id.indexOf('wireless controller') !== -1) {
+            activeGamepadMap = psAlternateMap;
+            detectedGamepadType = 'playstation';
+            console.log('[Input] Detected PlayStation controller:', gp.id);
+        } else {
+            activeGamepadMap = gamepadMap;
+            detectedGamepadType = 'standard';
+            console.log('[Input] Detected standard controller:', gp.id);
+        }
+    }
 
     function init() {
         loadKeyMap();
         setupKeyboard();
         setupTVRemote();
+        setupGamepadEvents();
         startGamepadPolling();
+    }
+
+    function setupGamepadEvents() {
+        window.addEventListener('gamepadconnected', function(e) {
+            console.log('[Input] Gamepad connected:', e.gamepad.id, 'index:', e.gamepad.index);
+            detectGamepadType(e.gamepad);
+        });
+        window.addEventListener('gamepaddisconnected', function(e) {
+            console.log('[Input] Gamepad disconnected:', e.gamepad.id);
+            detectedGamepadType = null;
+            activeGamepadMap = gamepadMap;
+        });
     }
 
     function loadKeyMap() {
@@ -149,11 +206,27 @@ var Input = (function() {
         });
     }
 
+    var useRAFPolling = false;
+    var rafPollId = null;
+
     function startGamepadPolling() {
-        gamepadPollInterval = setInterval(pollGamepads, 16);
+        // Use rAF-based polling for better sync with render loop and lower overhead
+        useRAFPolling = true;
+        rafPollLoop();
+    }
+
+    function rafPollLoop() {
+        if (!useRAFPolling) return;
+        pollGamepads();
+        rafPollId = requestAnimationFrame(rafPollLoop);
     }
 
     function stopGamepadPolling() {
+        useRAFPolling = false;
+        if (rafPollId) {
+            cancelAnimationFrame(rafPollId);
+            rafPollId = null;
+        }
         if (gamepadPollInterval) {
             clearInterval(gamepadPollInterval);
             gamepadPollInterval = null;
@@ -166,6 +239,9 @@ var Input = (function() {
             var gp = gamepads[gi];
             if (!gp) continue;
 
+            // Auto-detect controller type on first poll
+            if (!detectedGamepadType) detectGamepadType(gp);
+
             var id = gp.index;
             if (!prevGamepadState[id]) prevGamepadState[id] = { buttons: {}, axes: {} };
             var prev = prevGamepadState[id];
@@ -176,12 +252,16 @@ var Input = (function() {
 
                 if (pressed !== wasPressed) {
                     prev.buttons[bi] = pressed;
-                    var button = gamepadMap[bi];
+                    var button = activeGamepadMap[bi];
                     if (button) {
                         if (callbacks.game) callbacks.game(button, pressed);
                         if (pressed && callbacks.menu) {
                             if (button === BUTTONS.A || button === BUTTONS.START) callbacks.menu('enter');
                             else if (button === BUTTONS.B) callbacks.menu('back');
+                            else if (button === BUTTONS.UP) callbacks.menu('up');
+                            else if (button === BUTTONS.DOWN) callbacks.menu('down');
+                            else if (button === BUTTONS.LEFT) callbacks.menu('left');
+                            else if (button === BUTTONS.RIGHT) callbacks.menu('right');
                         }
                     }
                 }
