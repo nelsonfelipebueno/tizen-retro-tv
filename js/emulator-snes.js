@@ -9,7 +9,8 @@ var EmulatorSNES = (function() {
     function init(canvasEl, onReady) {
         canvas = canvasEl;
 
-        // Set canvas size to SNES native resolution
+        // Set canvas to SNES native resolution — no upscaling in canvas
+        // CSS handles the display scaling (much cheaper)
         canvas.width = 256;
         canvas.height = 224;
 
@@ -20,22 +21,25 @@ var EmulatorSNES = (function() {
             preRun: [],
             postRun: [function() {
                 isLoaded = true;
+                // Give the canvas focus so SDL keyboard events work
+                canvas.setAttribute('tabindex', '0');
+                canvas.focus();
                 if (onReady) onReady();
             }],
             print: function(text) {
                 console.log('[SNES]', text);
             },
             printErr: function(text) {
-                console.warn('[SNES]', text);
+                // Suppress noisy warnings
             },
-            setStatus: function(text) {
-                if (text) console.log('[SNES Status]', text);
-            },
+            setStatus: function() {},
             totalDependencies: 0,
             monitorRunDependencies: function(left) {
                 this.totalDependencies = Math.max(this.totalDependencies, left);
             },
-            noExitRuntime: true
+            noExitRuntime: true,
+            // Performance: disable Emscripten's automatic canvas resize
+            doNotCaptureKeyboard: false
         };
 
         // Dynamically load snes9x.js

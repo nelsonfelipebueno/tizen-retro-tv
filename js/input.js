@@ -43,6 +43,9 @@ var Input = (function() {
     var gamepadPollInterval = null;
     var prevGamepadState = {};
 
+    // Buttons that trigger pause menu (Xbox Guide / PS button)
+    var MENU_BUTTONS = { 16: true, 17: true };
+
     var gamepadMap = {
         0: BUTTONS.A,
         1: BUTTONS.B,
@@ -52,17 +55,14 @@ var Input = (function() {
         5: BUTTONS.R,
         8: BUTTONS.SELECT,
         9: BUTTONS.START,
-        // D-pad buttons (PlayStation controllers and many others report D-pad as buttons 12-15)
         12: BUTTONS.UP,
         13: BUTTONS.DOWN,
         14: BUTTONS.LEFT,
         15: BUTTONS.RIGHT
     };
 
-    // Alternative mapping for PlayStation controllers where Cross=0, Circle=1
-    // On some Tizen/Samsung TV Bluetooth stacks, PS buttons may shift
     var psAlternateMap = {
-        0: BUTTONS.B,       // Cross → B (confirm in Nintendo layout)
+        0: BUTTONS.B,       // Cross → B
         1: BUTTONS.A,       // Circle → A
         2: BUTTONS.Y,       // Square → Y
         3: BUTTONS.X,       // Triangle → X
@@ -73,9 +73,7 @@ var Input = (function() {
         12: BUTTONS.UP,
         13: BUTTONS.DOWN,
         14: BUTTONS.LEFT,
-        15: BUTTONS.RIGHT,
-        // Some PS controllers map L2/R2 as buttons 6/7, touchpad as 17
-        16: BUTTONS.START   // PS button fallback
+        15: BUTTONS.RIGHT
     };
 
     var activeGamepadMap = gamepadMap;
@@ -145,17 +143,44 @@ var Input = (function() {
         if (!keyValue) return;
 
         var eventType = pressed ? 'keydown' : 'keyup';
+
+        // Emscripten SDL listens on window, document, and canvas
+        // We need keyCode for SDL to recognize the key
+        var keyCode = 0;
+        var code = '';
+        if (keyValue === 'ArrowUp') { keyCode = 38; code = 'ArrowUp'; }
+        else if (keyValue === 'ArrowDown') { keyCode = 40; code = 'ArrowDown'; }
+        else if (keyValue === 'ArrowLeft') { keyCode = 37; code = 'ArrowLeft'; }
+        else if (keyValue === 'ArrowRight') { keyCode = 39; code = 'ArrowRight'; }
+        else if (keyValue === 'Enter') { keyCode = 13; code = 'Enter'; }
+        else if (keyValue === ' ') { keyCode = 32; code = 'Space'; }
+        else { keyCode = keyValue.toUpperCase().charCodeAt(0); code = 'Key' + keyValue.toUpperCase(); }
+
         var event = new KeyboardEvent(eventType, {
             key: keyValue,
-            code: keyValue === ' ' ? 'Space' : 'Key' + keyValue.toUpperCase(),
+            code: code,
+            keyCode: keyCode,
+            which: keyCode,
             bubbles: true,
             cancelable: true
         });
+
+        // Mark as synthetic so our keyboard handler ignores it
+        event._synthetic = true;
+
+        // Dispatch on canvas (where Emscripten SDL listens)
+        var canvas = document.getElementById('game-canvas');
+        if (canvas) canvas.dispatchEvent(event);
+        // Also dispatch on document and window for Emscripten compatibility
         document.dispatchEvent(event);
+        window.dispatchEvent(event);
     }
 
     function setupKeyboard() {
         document.addEventListener('keydown', function(e) {
+            // Ignore synthetic events from gamepad→SNES dispatch
+            if (e._synthetic) return;
+
             var button = keyMap[e.key];
             if (!button) {
                 if (e.key === 'Escape' || e.key === 'Backspace') {
@@ -181,6 +206,7 @@ var Input = (function() {
         });
 
         document.addEventListener('keyup', function(e) {
+            if (e._synthetic) return;
             var button = keyMap[e.key];
             if (!button) return;
             e.preventDefault();
@@ -246,6 +272,11 @@ var Input = (function() {
             if (!prevGamepadState[id]) prevGamepadState[id] = { buttons: {}, axes: {} };
             var prev = prevGamepadState[id];
 
+            // During gameplay: buttons go ONLY to game callback
+            // During menus: buttons go ONLY to menu callback
+            // Start+Select combo always triggers pause (via menu 'back')
+            var inGame = !!callbacks.game;
+
             for (var bi = 0; bi < gp.buttons.length; bi++) {
                 var pressed = gp.buttons[bi].pressed;
                 var wasPressed = prev.buttons[bi] || false;
@@ -254,8 +285,11 @@ var Input = (function() {
                     prev.buttons[bi] = pressed;
                     var button = activeGamepadMap[bi];
                     if (button) {
-                        if (callbacks.game) callbacks.game(button, pressed);
-                        if (pressed && callbacks.menu) {
+                        if (inGame) {
+                            // During gameplay: send to game only
+                            callbacks.game(button, pressed);
+                        } else if (pressed && callbacks.menu) {
+                            // During menus: send to menu only
                             if (button === BUTTONS.A || button === BUTTONS.START) callbacks.menu('enter');
                             else if (button === BUTTONS.B) callbacks.menu('back');
                             else if (button === BUTTONS.UP) callbacks.menu('up');
@@ -279,33 +313,37 @@ var Input = (function() {
 
                 if (left !== (prev.axes.left || false)) {
                     prev.axes.left = left;
-                    if (callbacks.game) callbacks.game(BUTTONS.LEFT, left);
-                    if (left && callbacks.menu) callbacks.menu('left');
+                    if (inGame) callbacks.game(BUTTONS.LEFT, left);
+                    else if (left && callbacks.menu) callbacks.menu('left');
                 }
                 if (right !== (prev.axes.right || false)) {
                     prev.axes.right = right;
-                    if (callbacks.game) callbacks.game(BUTTONS.RIGHT, right);
-                    if (right && callbacks.menu) callbacks.menu('right');
+                    if (inGame) callbacks.game(BUTTONS.RIGHT, right);
+                    else if (right && callbacks.menu) callbacks.menu('right');
                 }
                 if (up !== (prev.axes.up || false)) {
                     prev.axes.up = up;
-                    if (callbacks.game) callbacks.game(BUTTONS.UP, up);
-                    if (up && callbacks.menu) callbacks.menu('up');
+                    if (inGame) callbacks.game(BUTTONS.UP, up);
+                    else if (up && callbacks.menu) callbacks.menu('up');
                 }
                 if (down !== (prev.axes.down || false)) {
                     prev.axes.down = down;
-                    if (callbacks.game) callbacks.game(BUTTONS.DOWN, down);
-                    if (down && callbacks.menu) callbacks.menu('down');
+                    if (inGame) callbacks.game(BUTTONS.DOWN, down);
+                    else if (down && callbacks.menu) callbacks.menu('down');
                 }
             }
 
+            // Pause triggers: Start+Select combo OR Menu/Guide button (16/17)
             var startPressed = gp.buttons[9] && gp.buttons[9].pressed;
             var selectPressed = gp.buttons[8] && gp.buttons[8].pressed;
             var combo = startPressed && selectPressed;
-            if (combo && !prev.pauseCombo) {
+            var menuBtn = (gp.buttons[16] && gp.buttons[16].pressed) ||
+                          (gp.buttons[17] && gp.buttons[17].pressed);
+            var pauseTrigger = combo || menuBtn;
+            if (pauseTrigger && !prev.pauseCombo) {
                 if (callbacks.menu) callbacks.menu('back');
             }
-            prev.pauseCombo = combo;
+            prev.pauseCombo = pauseTrigger;
         }
     }
 
