@@ -14,7 +14,7 @@ zip -r "$DIST_DIR/$WGT_NAME" \
   js/ \
   lib/ \
   assets/ \
-  -x "*.DS_Store" "*__MACOSX*" "*.git*" "*.md"
+  -x "*.DS_Store" "*__MACOSX*" "*.git*" "*.md" "*.wgt" "author-signature*" "signature*" ".manifest*" "dist/*" "docs/*" "dev-server.sh" ".gitignore"
 
 echo ""
 echo "========================================="

@@ -4,9 +4,10 @@
         id="http://retrotv.app/TizenRetroTV"
         version="1.0.0"
         viewmodes="maximized">
-    <tizen:application id="rEtr0tvApp.TizenRetroTV"
-                       package="rEtr0tvApp"
-                       required_version="5.5"/>
+    <access origin="*" subdomains="true"/>
+    <tizen:application id="xR3tr0TvAp.TizenRetroTV"
+                       package="xR3tr0TvAp"
+                       required_version="3.0"/>
     <content src="index.html"/>
     <name>Retro TV</name>
     <icon src="assets/icons/icon-117.png"/>
@@ -14,7 +15,8 @@
     <tizen:privilege name="http://tizen.org/privilege/filesystem.write"/>
     <tizen:privilege name="http://tizen.org/privilege/externalstorage"/>
     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
     <feature name="http://tizen.org/feature/screen.size.all"/>
     <tizen:profile name="tv-samsung"/>
-    <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable"/>
+    <tizen:setting screen-orientation="landscape" context-menu="enable" background-support="enable" encryption="disable" install-location="auto" hwkey-event="enable"/>
 </widget>
