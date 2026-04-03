@@ -5,9 +5,12 @@ var RomLoader = (function() {
     var NES_EXTENSIONS = ['.nes'];
     var ZIP_EXTENSION = '.zip';
 
-    // NES ROMs bundled in the .wgt — add entries here
     var BUNDLED_ROMS = [
-        // { name: 'Super Mario Bros', fullName: 'smb.nes', path: 'roms/smb.nes', system: 'nes', bundled: true }
+        // SNES
+        { name: 'Super Mario World (US)', fullName: 'smw.smc', path: 'roms/smw.smc', system: 'snes', bundled: true },
+        { name: 'Super Mario World (PT-BR)', fullName: 'smw-ptbr.sfc', path: 'roms/smw-ptbr.sfc', system: 'snes', bundled: true },
+        { name: 'SMW All-Stars + SMW', fullName: 'smw-allstars.sfc', path: 'roms/smw-allstars.sfc', system: 'snes', bundled: true }
+        // NES — add .nes ROMs to roms/ folder and list here
     ];
 
     var USB_PATHS = [
