@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>NaCl Test</title></head>
+<body style="background:#000;color:#fff;font-family:monospace;padding:20px;">
+<h1>NaCl Support Test</h1>
+<div id="log"></div>
+
+<embed id="nacl-test"
+    width="640" height="480"
+    src="nacl_app/app.nmf"
+    type="application/x-nacl" />
+
+<script>
+function log(msg) {
+    document.getElementById('log').innerHTML += msg + '<br>';
+}
+
+var embed = document.getElementById('nacl-test');
+
+log('1. Embed element created');
+log('2. Type: ' + embed.type);
+log('3. Src: ' + embed.src);
+
+embed.addEventListener('loadstart', function() { log('EVENT: loadstart'); });
+embed.addEventListener('progress', function(e) { log('EVENT: progress ' + (e.lengthComputable ? Math.round(e.loaded/e.total*100)+'%' : '')); });
+embed.addEventListener('load', function() { log('EVENT: load — NaCl module LOADED!'); });
+embed.addEventListener('error', function() { log('EVENT: ERROR — NaCl not supported or module failed'); });
+embed.addEventListener('crash', function() { log('EVENT: crash'); });
+embed.addEventListener('message', function(e) { log('EVENT: message — ' + String(e.data).substring(0,100)); });
+
+// Check if NaCl is available
+log('4. navigator.mimeTypes check...');
+var hasMime = false;
+for (var i = 0; i < navigator.mimeTypes.length; i++) {
+    if (navigator.mimeTypes[i].type === 'application/x-nacl') {
+        hasMime = true;
+        log('5. FOUND: application/x-nacl MIME type — NaCl IS supported!');
+        break;
+    }
+}
+if (!hasMime) {
+    log('5. NOT FOUND: application/x-nacl MIME type — NaCl may NOT be supported');
+}
+
+setTimeout(function() {
+    log('6. Timeout check — if no load/error event fired, NaCl is probably disabled');
+}, 10000);
+</script>
+</body>
+</html>

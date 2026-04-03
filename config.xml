@@ -9,7 +9,7 @@
     <tizen:application id="xR3tr0TvAp.TizenRetroTV"
                        package="xR3tr0TvAp"
                        required_version="3.0"/>
-    <content src="index.html"/>
+    <content src="nacl_test.html"/>
     <tizen:content-security-policy>*</tizen:content-security-policy>
     <name>Retro TV</name>
     <icon src="assets/icons/icon-117.png"/>
