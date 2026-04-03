@@ -7,6 +7,7 @@ var RomLoader = (function() {
 
     var BUNDLED_ROMS = [
         { name: 'Super Mario World (US)', fullName: 'smw.smc', path: 'roms/smw.smc', system: 'snes', bundled: true },
+        { name: 'SMW All-Stars No Music (leve)', fullName: 'smw-nomusic.sfc', path: 'roms/smw-nomusic.sfc', system: 'snes', bundled: true },
         { name: 'Super Mario World (PT-BR)', fullName: 'smw-ptbr.sfc', path: 'roms/smw-ptbr.sfc', system: 'snes', bundled: true },
         { name: 'Super Mario All-Stars + SMW', fullName: 'smw-allstars.sfc', path: 'roms/smw-allstars.sfc', system: 'snes', bundled: true }
     ];
