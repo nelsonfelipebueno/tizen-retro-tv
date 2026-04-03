@@ -4,9 +4,20 @@ var EmulatorSNES = (function() {
     var naclModule = null;
     var isLoaded = false;
     var frameLoopId = null;
+    var prevBitmask = 0;
+    var onReadyCallback = null;
+
+    // Button name mapping for snes4nacl keyEvent bridge
+    var bitToButton = {
+        7: 'J1_A', 15: 'J1_B', 6: 'J1_X', 14: 'J1_Y',
+        5: 'J1_L', 4: 'J1_R', 12: 'J1_START', 13: 'J1_SELECT',
+        11: 'J1_UP', 10: 'J1_DOWN', 9: 'J1_LEFT', 8: 'J1_RIGHT'
+    };
 
     function init(container, onReady) {
-        // Create embed element for NaCl
+        onReadyCallback = onReady;
+        prevBitmask = 0;
+
         var embed = document.createElement('embed');
         embed.id = 'nacl-snes';
         embed.setAttribute('type', 'application/x-nacl');
@@ -20,13 +31,12 @@ var EmulatorSNES = (function() {
         naclModule.addEventListener('load', function() {
             isLoaded = true;
             naclModule.postMessage('init');
-            if (onReady) onReady();
         });
 
         naclModule.addEventListener('message', function(e) {
-            if (e.data === 'rom_loaded') {
-                naclModule.postMessage('play');
-                startFrameLoop();
+            var data = String(e.data);
+            if (data === 'initFinished') {
+                if (onReadyCallback) onReadyCallback();
             }
         });
 
@@ -41,9 +51,26 @@ var EmulatorSNES = (function() {
 
     function loadROM(arrayBuffer) {
         if (!isLoaded) return;
-        var blob = new Blob([arrayBuffer]);
-        var url = URL.createObjectURL(blob);
-        naclModule.postMessage('downloadThenLoadRom url:' + url);
+
+        // NaCl URLLoader can't handle blob URLs.
+        // Instead, send ROM data directly via postMessage as ArrayBuffer.
+        // snes4nacl uses downloadThenLoadRom with URL, but we need to
+        // write to virtual FS via postMessage.
+        // For now, use a data: URL which URLLoader CAN fetch.
+        var bytes = new Uint8Array(arrayBuffer);
+        var binary = '';
+        for (var i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        var b64 = btoa(binary);
+        var dataUrl = 'data:application/octet-stream;base64,' + b64;
+        naclModule.postMessage('downloadThenLoadRom url:' + dataUrl);
+
+        // Start frame loop after a short delay for ROM loading
+        setTimeout(function() {
+            naclModule.postMessage('play');
+            startFrameLoop();
+        }, 2000);
     }
 
     function startFrameLoop() {
@@ -63,34 +90,37 @@ var EmulatorSNES = (function() {
 
     function setInput(bitmask) {
         if (!isLoaded || !naclModule) return;
-        naclModule.postMessage('keyEvent c:J1_A d:' + (bitmask & (1 << 7) ? 'down' : 'up'));
-        naclModule.postMessage('keyEvent c:J1_B d:' + (bitmask & (1 << 15) ? 'down' : 'up'));
-        naclModule.postMessage('keyEvent c:J1_X d:' + (bitmask & (1 << 6) ? 'down' : 'up'));
-        naclModule.postMessage('keyEvent c:J1_Y d:' + (bitmask & (1 << 14) ? 'down' : 'up'));
-        naclModule.postMessage('keyEvent c:J1_L d:' + (bitmask & (1 << 5) ? 'down' : 'up'));
-        naclModule.postMessage('keyEvent c:J1_R d:' + (bitmask & (1 << 4) ? 'down' : 'up'));
-        naclModule.postMessage('keyEvent c:J1_START d:' + (bitmask & (1 << 12) ? 'down' : 'up'));
-        naclModule.postMessage('keyEvent c:J1_SELECT d:' + (bitmask & (1 << 13) ? 'down' : 'up'));
-        naclModule.postMessage('keyEvent c:J1_UP d:' + (bitmask & (1 << 11) ? 'down' : 'up'));
-        naclModule.postMessage('keyEvent c:J1_DOWN d:' + (bitmask & (1 << 10) ? 'down' : 'up'));
-        naclModule.postMessage('keyEvent c:J1_LEFT d:' + (bitmask & (1 << 9) ? 'down' : 'up'));
-        naclModule.postMessage('keyEvent c:J1_RIGHT d:' + (bitmask & (1 << 8) ? 'down' : 'up'));
+        // Only send messages for buttons that CHANGED (delta encoding)
+        var changed = bitmask ^ prevBitmask;
+        if (!changed) return;
+        for (var bit in bitToButton) {
+            var b = parseInt(bit);
+            if (changed & (1 << b)) {
+                var state = (bitmask & (1 << b)) ? 'down' : 'up';
+                naclModule.postMessage('keyEvent c:' + bitToButton[bit] + ' d:' + state);
+            }
+        }
+        prevBitmask = bitmask;
     }
 
     function pause() {
         stopFrameLoop();
-        naclModule.postMessage('pause');
+        if (naclModule) naclModule.postMessage('pause');
     }
 
     function resume() {
-        naclModule.postMessage('play');
+        if (naclModule) naclModule.postMessage('play');
         startFrameLoop();
     }
 
     function destroy() {
         stopFrameLoop();
+        if (naclModule && naclModule.parentNode) {
+            naclModule.parentNode.removeChild(naclModule);
+        }
         isLoaded = false;
         naclModule = null;
+        prevBitmask = 0;
     }
 
     return {

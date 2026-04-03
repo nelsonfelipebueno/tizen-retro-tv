@@ -21,16 +21,13 @@ var App = (function() {
                 if (!system) { UI.toast('Unsupported file'); return; }
                 currentSystem = system;
                 currentRom = { name: file.name, system: system };
-                if (system === 'snes') {
-                    // SNES: redirect to snes9x2005 with blob URL
-                    var url = URL.createObjectURL(file);
-                    EmulatorSNES.launch(url);
-                } else {
-                    setState('LOADING');
-                    var reader = new FileReader();
-                    reader.onload = function(ev) { startNES(ev.target.result, file.name); };
-                    reader.readAsArrayBuffer(file);
-                }
+                setState('LOADING');
+                var reader = new FileReader();
+                reader.onload = function(ev) {
+                    if (system === 'snes') startSNES(ev.target.result, file.name);
+                    else startNES(ev.target.result, file.name);
+                };
+                reader.readAsArrayBuffer(file);
             });
         }
 
