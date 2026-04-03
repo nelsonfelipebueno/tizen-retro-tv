@@ -1,75 +1,54 @@
 var App = (function() {
     'use strict';
 
-    var state = 'MENU';
-    var currentSystem = 'snes';
+    var state = 'ROM_LIST';
     var currentRoms = [];
     var currentRom = null;
-    var emulator = null;
+    var emulator = EmulatorNES;
     var canvas = document.getElementById('game-canvas');
 
     function init() {
         Input.init();
-        Input.setMenuCallback(handleMenuInput);
+        Input.setMenuCallback(handleRomListInput);
 
+        // Dev mode: file input
         var fileInput = document.getElementById('file-input');
         if (fileInput) {
             fileInput.addEventListener('change', function(e) {
                 var file = e.target.files[0];
                 if (!file) return;
-                var system = RomLoader.getSystem(file.name);
-                if (!system) {
-                    UI.toast('Unsupported file type');
-                    return;
-                }
-                currentSystem = system;
-                currentRom = { name: file.name, system: system };
+                currentRom = { name: file.name };
                 setState('LOADING');
-                RomLoader.loadRomFile(file, function(err, buffer, sys) {
-                    if (err) {
-                        UI.toast('Error: ' + err.message);
-                        setState('MENU');
-                        return;
-                    }
-                    startEmulator(buffer, file.name);
-                });
+                var reader = new FileReader();
+                reader.onload = function(ev) {
+                    startEmulator(ev.target.result, file.name);
+                };
+                reader.readAsArrayBuffer(file);
             });
         }
 
-        window.addEventListener('resize', function() {
-            if (state === 'PLAYING' || state === 'PAUSED') {
-                var nativeH = currentSystem === 'snes' ? 224 : 240;
-                UI.resizeCanvas(canvas, 256, nativeH);
-            }
-        });
-
-        setState('MENU');
+        // Load ROM list immediately
+        setState('ROM_LIST');
     }
 
     function setState(newState) {
         state = newState;
 
         switch (state) {
-            case 'MENU':
-                UI.showScreen('menu');
-                Input.setMenuCallback(handleMenuInput);
-                Input.setGameCallback(null);
-                break;
-
             case 'ROM_LIST':
                 UI.showScreen('romlist');
                 Input.setMenuCallback(handleRomListInput);
                 Input.setGameCallback(null);
+                Input.setPauseCallback(null);
                 RomLoader.scanRoms(false, function(roms) {
-                    currentRoms = roms[currentSystem] || [];
-                    UI.renderRomList(currentRoms, currentSystem);
+                    currentRoms = roms.nes || [];
+                    UI.renderRomList(currentRoms, 'nes');
                 });
                 break;
 
             case 'LOADING':
                 UI.showScreen('loading');
                 Input.setMenuCallback(null);
-                Input.setGameCallback(null);
                 break;
 
             case 'PLAYING':
@@ -77,18 +56,8 @@ var App = (function() {
                 Input.setMenuCallback(null);
                 Input.setGameCallback(handleGameInput);
                 Input.setPauseCallback(function() { pauseGame(); });
-                var nativeH = currentSystem === 'snes' ? 224 : 240;
-                UI.resizeCanvas(canvas, 256, nativeH);
-                canvas.setAttribute('tabindex', '0');
-                canvas.focus();
-                // Resume AudioContext (needs user gesture on Tizen)
-                try {
-                    var ac = window.AudioContext || window.webkitAudioContext;
-                    if (ac && ac.prototype && ac.prototype.resume) {
-                        var ctx = new ac();
-                        ctx.resume();
-                    }
-                } catch(e) {}
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
                 break;
 
             case 'PAUSED':
@@ -96,32 +65,24 @@ var App = (function() {
                 Input.setGameCallback(null);
                 Input.setPauseCallback(null);
                 Input.setMenuCallback(handlePauseInput);
-                if (currentSystem === 'nes') {
-                    var slots = SaveManager.getSlotInfo(currentRom.name);
-                    UI.updateSaveSlots({
-                        1: slots[1].exists,
-                        2: slots[2].exists,
-                        3: slots[3].exists
-                    });
-                } else {
-                    UI.updateSaveSlots({ 1: false, 2: false, 3: false });
-                }
                 break;
         }
     }
 
-    function handleMenuInput(action) {
-        if (state !== 'MENU') return;
-        switch (action) {
-            case 'left':
-            case 'right':
-                UI.navigateList('.system-card', action);
-                break;
-            case 'enter':
-                currentSystem = UI.getSelectedData('.system-card', 'system') || 'snes';
-                setState('ROM_LIST');
-                break;
+    function resizeCanvas() {
+        var w = window.innerWidth;
+        var h = window.innerHeight;
+        var ratio = 256 / 240; // NES aspect ratio
+        var cw, ch;
+        if (w / h > ratio) {
+            ch = h;
+            cw = ch * ratio;
+        } else {
+            cw = w;
+            ch = cw / ratio;
         }
+        canvas.style.width = Math.floor(cw) + 'px';
+        canvas.style.height = Math.floor(ch) + 'px';
     }
 
     function handleRomListInput(action) {
@@ -139,16 +100,6 @@ var App = (function() {
                     loadAndStartRom(currentRom);
                 }
                 break;
-            case 'back':
-                setState('MENU');
-                break;
-        }
-    }
-
-    function handleGameMenuInput(action) {
-        if (state !== 'PLAYING') return;
-        if (action === 'back') {
-            pauseGame();
         }
     }
 
@@ -160,8 +111,8 @@ var App = (function() {
                 UI.navigateList('.pause-item:not(.disabled)', action);
                 break;
             case 'enter':
-                var pauseAction = UI.getSelectedData('.pause-item', 'action');
-                executePauseAction(pauseAction);
+                var act = UI.getSelectedData('.pause-item', 'action');
+                executePauseAction(act);
                 break;
             case 'back':
                 resumeGame();
@@ -170,126 +121,111 @@ var App = (function() {
     }
 
     function handleGameInput(button, pressed) {
-        if (state !== 'PLAYING' || !emulator) return;
+        if (state !== 'PLAYING') return;
         emulator.setInput(button, pressed);
     }
 
     function loadAndStartRom(rom) {
-        // Launch webretro directly — it handles everything (rendering, audio, gamepad, save states)
-        EmulatorSNES.launch(rom.path);
+        if (rom.bundled) {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', rom.path, true);
+            xhr.responseType = 'arraybuffer';
+            xhr.onload = function() {
+                if (xhr.status === 200 || xhr.status === 0) {
+                    startEmulator(xhr.response, rom.name);
+                } else {
+                    UI.toast('Failed to load ROM');
+                    setState('ROM_LIST');
+                }
+            };
+            xhr.onerror = function() {
+                UI.toast('Failed to load ROM');
+                setState('ROM_LIST');
+            };
+            xhr.send();
+        } else if (window.tizen && tizen.filesystem) {
+            tizen.filesystem.resolve(rom.path, function(file) {
+                file.readAsArrayBuffer(function(buffer) {
+                    startEmulator(buffer, rom.name);
+                }, function() {
+                    UI.toast('Failed to read ROM');
+                    setState('ROM_LIST');
+                });
+            }, function() {
+                UI.toast('ROM not found');
+                setState('ROM_LIST');
+            }, 'r');
+        } else {
+            UI.toast('Use file picker in dev mode');
+            setState('ROM_LIST');
+        }
     }
 
     function startEmulator(romBuffer, name) {
-        if (emulator && emulator.destroy) {
-            emulator.destroy();
-        }
-
-        if (currentSystem === 'snes') {
-            emulator = EmulatorSNES;
-            emulator.init(canvas, function() {
-                var sramData = SaveManager.load(name, 'sram');
-                if (sramData) {
-                    emulator.loadSRAM(sramData);
-                }
-
-                emulator.loadROM(romBuffer, name);
-                emulator.start();
-                setState('PLAYING');
-            });
-        } else {
-            emulator = EmulatorNES;
-            emulator.init(canvas, function() {
-                emulator.loadROM(romBuffer, name);
-                emulator.start();
-                setState('PLAYING');
-            });
-        }
+        if (emulator.destroy) emulator.destroy();
+        emulator.init(canvas, function() {
+            emulator.loadROM(romBuffer, name);
+            emulator.start();
+            setState('PLAYING');
+        });
     }
 
     function pauseGame() {
-        if (emulator && emulator.pause) {
-            emulator.pause();
-        }
+        emulator.pause();
+        // Update save slot availability
+        var slots = SaveManager.getSlotInfo(currentRom.name);
+        UI.updateSaveSlots({
+            1: slots[1].exists,
+            2: slots[2].exists,
+            3: slots[3].exists
+        });
         setState('PAUSED');
     }
 
     function resumeGame() {
         UI.hidePause();
-        if (emulator && emulator.resume) {
-            emulator.resume();
-        }
+        emulator.resume();
         setState('PLAYING');
     }
 
     function executePauseAction(action) {
         if (!action) return;
-
         switch (action) {
             case 'resume':
                 resumeGame();
                 break;
             case 'reset':
-                if (emulator && emulator.reset) emulator.reset();
+                emulator.reset();
                 resumeGame();
                 break;
-            case 'save1':
-            case 'save2':
-            case 'save3':
+            case 'save1': case 'save2': case 'save3':
                 var saveSlot = parseInt(action.replace('save', ''));
-                doSave(saveSlot);
+                var stateData = emulator.saveState();
+                if (stateData) {
+                    var ok = SaveManager.save(currentRom.name, saveSlot, stateData);
+                    UI.toast(ok ? 'Saved slot ' + saveSlot : 'Save failed');
+                }
                 break;
-            case 'load1':
-            case 'load2':
-            case 'load3':
+            case 'load1': case 'load2': case 'load3':
                 var loadSlot = parseInt(action.replace('load', ''));
-                doLoad(loadSlot);
+                var loadData = SaveManager.load(currentRom.name, loadSlot);
+                if (loadData) {
+                    var ok = emulator.loadState(loadData);
+                    UI.toast(ok ? 'Loaded slot ' + loadSlot : 'Load failed');
+                    if (ok) resumeGame();
+                } else {
+                    UI.toast('Slot ' + loadSlot + ' empty');
+                }
                 break;
             case 'quit':
-                if (emulator && emulator.destroy) emulator.destroy();
-                emulator = null;
-                setState('MENU');
+                emulator.destroy();
+                window.removeEventListener('resize', resizeCanvas);
+                setState('ROM_LIST');
                 break;
         }
     }
 
-    function doSave(slot) {
-        if (!emulator || !currentRom) return;
-
-        if (currentSystem === 'nes' && emulator.saveState) {
-            var stateData = emulator.saveState();
-            if (stateData) {
-                var ok = SaveManager.save(currentRom.name, slot, stateData);
-                UI.toast(ok ? 'Saved to slot ' + slot : 'Save failed (storage full?)');
-            }
-        } else if (currentSystem === 'snes' && emulator.saveSRAM) {
-            var sram = emulator.saveSRAM();
-            if (sram) {
-                SaveManager.save(currentRom.name, 'sram', sram);
-                UI.toast('SRAM saved');
-            } else {
-                UI.toast('No SRAM data (game may not support saves)');
-            }
-        }
-    }
-
-    function doLoad(slot) {
-        if (!emulator || !currentRom) return;
-
-        if (currentSystem === 'nes' && emulator.loadState) {
-            var stateData = SaveManager.load(currentRom.name, slot);
-            if (stateData) {
-                var ok = emulator.loadState(stateData);
-                UI.toast(ok ? 'Loaded slot ' + slot : 'Load failed');
-                if (ok) resumeGame();
-            } else {
-                UI.toast('Slot ' + slot + ' is empty');
-            }
-        }
-    }
-
-    return {
-        init: init
-    };
+    return { init: init };
 })();
 
 document.addEventListener('DOMContentLoaded', function() {
