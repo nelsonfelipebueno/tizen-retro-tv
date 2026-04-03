@@ -162,7 +162,16 @@ var App = (function() {
     }
 
     function loadAndStartRom(rom) {
-        if (window.tizen) {
+        if (rom.bundled) {
+            RomLoader.loadBundledRom(rom, function(err, buffer, system) {
+                if (err) {
+                    UI.toast('Error: ' + err.message);
+                    setState('ROM_LIST');
+                    return;
+                }
+                startEmulator(buffer, rom.name);
+            });
+        } else if (window.tizen) {
             RomLoader.loadRomTizen(rom, function(err, buffer, system) {
                 if (err) {
                     UI.toast('Error: ' + err.message);

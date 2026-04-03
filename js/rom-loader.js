@@ -5,6 +5,12 @@ var RomLoader = (function() {
     var NES_EXTENSIONS = ['.nes'];
     var ZIP_EXTENSION = '.zip';
 
+    var BUNDLED_ROMS = [
+        { name: 'Super Mario World (US)', fullName: 'smw.smc', path: 'roms/smw.smc', system: 'snes', bundled: true },
+        { name: 'Super Mario World (PT-BR)', fullName: 'smw-ptbr.sfc', path: 'roms/smw-ptbr.sfc', system: 'snes', bundled: true },
+        { name: 'Super Mario All-Stars + SMW', fullName: 'smw-allstars.sfc', path: 'roms/smw-allstars.sfc', system: 'snes', bundled: true }
+    ];
+
     var USB_PATHS = [
         'removable_usb1', 'removable_usb2',
         'removable_usb3', 'removable_usb4'
@@ -157,43 +163,42 @@ var RomLoader = (function() {
         }
     }
 
-    function scanRoms(forceRefresh, callback) {
-        if (cachedRoms && !forceRefresh) {
-            callback(cachedRoms);
-            return;
-        }
-
-        if (!forceRefresh) {
-            var cached = localStorage.getItem('rom_list_cache');
-            if (cached) {
-                try {
-                    cachedRoms = JSON.parse(cached);
-                    callback(cachedRoms);
-                    return;
-                } catch(e) {}
+    function loadBundledRom(romInfo, callback) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', romInfo.path, true);
+        xhr.responseType = 'arraybuffer';
+        xhr.onload = function() {
+            if (xhr.status === 200 || xhr.status === 0) {
+                callback(null, xhr.response, romInfo.system);
+            } else {
+                callback(new Error('Failed to load ROM: HTTP ' + xhr.status));
             }
-        }
+        };
+        xhr.onerror = function() {
+            callback(new Error('Failed to load ROM'));
+        };
+        xhr.send();
+    }
+
+    function scanRoms(forceRefresh, callback) {
+        // Always include bundled ROMs
+        cachedRoms = { snes: [], nes: [] };
+        BUNDLED_ROMS.forEach(function(rom) {
+            if (rom.system === 'snes') cachedRoms.snes.push(rom);
+            else if (rom.system === 'nes') cachedRoms.nes.push(rom);
+        });
 
         if (!window.tizen) {
-            cachedRoms = { snes: [], nes: [] };
             callback(cachedRoms);
             return;
         }
 
+        // Also scan USB
         scanTizen(function(allRoms) {
-            cachedRoms = { snes: [], nes: [] };
             allRoms.forEach(function(rom) {
                 if (rom.system === 'snes') cachedRoms.snes.push(rom);
                 else if (rom.system === 'nes') cachedRoms.nes.push(rom);
             });
-
-            cachedRoms.snes.sort(function(a, b) { return a.name.localeCompare(b.name); });
-            cachedRoms.nes.sort(function(a, b) { return a.name.localeCompare(b.name); });
-
-            try {
-                localStorage.setItem('rom_list_cache', JSON.stringify(cachedRoms));
-            } catch(e) {}
-
             callback(cachedRoms);
         });
     }
@@ -202,6 +207,7 @@ var RomLoader = (function() {
         scanRoms: scanRoms,
         loadRomTizen: loadRomTizen,
         loadRomFile: loadRomFile,
+        loadBundledRom: loadBundledRom,
         getSystem: getSystem
     };
 })();
