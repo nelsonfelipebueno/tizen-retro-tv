@@ -8,37 +8,61 @@ var EmulatorSNES = (function() {
 
     function init(canvasEl, onReady) {
         canvas = canvasEl;
-
-        // Set canvas to SNES native resolution — no upscaling in canvas
-        // CSS handles the display scaling (much cheaper)
         canvas.width = 256;
         canvas.height = 224;
 
-        // Configure Emscripten Module BEFORE loading snes9x.js
+        // === PERFORMANCE: Kill audio BEFORE Emscripten loads ===
+        // SDL audio is the biggest CPU drain on TV hardware.
+        // Stub AudioContext so Emscripten SDL gets silence with zero CPU cost.
+        var Noop = function() { return this; };
+        var NoopPromise = function() { return { then: Noop, catch: Noop }; };
+        var FakeCtx = function() {
+            this.sampleRate = 22050;
+            this.state = 'running';
+            this.destination = {};
+            this.currentTime = 0;
+        };
+        FakeCtx.prototype.createScriptProcessor = function() {
+            return { connect: Noop, disconnect: Noop, onaudioprocess: null, bufferSize: 4096 };
+        };
+        FakeCtx.prototype.createGain = function() {
+            return { connect: Noop, gain: { value: 0, setValueAtTime: Noop } };
+        };
+        FakeCtx.prototype.createOscillator = function() {
+            return { connect: Noop, start: Noop, stop: Noop, frequency: { value: 0 } };
+        };
+        FakeCtx.prototype.createBuffer = function(ch, len, rate) {
+            var b = [];
+            for (var i = 0; i < ch; i++) b.push(new Float32Array(len));
+            return { getChannelData: function(c) { return b[c]; }, numberOfChannels: ch, length: len, sampleRate: rate };
+        };
+        FakeCtx.prototype.createBufferSource = function() {
+            return { connect: Noop, start: Noop, stop: Noop, buffer: null };
+        };
+        FakeCtx.prototype.resume = NoopPromise;
+        FakeCtx.prototype.suspend = NoopPromise;
+        FakeCtx.prototype.close = NoopPromise;
+        FakeCtx.prototype.decodeAudioData = function(buf, ok) { if (ok) ok(this.createBuffer(2, 1, 22050)); };
+        window.AudioContext = FakeCtx;
+        window.webkitAudioContext = FakeCtx;
+
+        // Configure Emscripten Module
         window.Module = {
             canvas: canvas,
             memoryInitializerPrefixURL: 'lib/xnes/',
             preRun: [],
             postRun: [function() {
                 isLoaded = true;
-                // Give the canvas focus so SDL keyboard events work
                 canvas.setAttribute('tabindex', '0');
                 canvas.focus();
                 if (onReady) onReady();
             }],
-            print: function(text) {
-                console.log('[SNES]', text);
-            },
-            printErr: function(text) {
-                // Suppress noisy warnings
-            },
+            print: function() {},
+            printErr: function() {},
             setStatus: function() {},
             totalDependencies: 0,
-            monitorRunDependencies: function(left) {
-                this.totalDependencies = Math.max(this.totalDependencies, left);
-            },
+            monitorRunDependencies: function() {},
             noExitRuntime: true,
-            // Performance: disable Emscripten's automatic canvas resize
             doNotCaptureKeyboard: false
         };
 
@@ -77,14 +101,9 @@ var EmulatorSNES = (function() {
         try {
             Module._run();
             isRunning = true;
-            // Enable frameskip on Tizen TVs for better performance
-            // Frameskip 1 = render every other frame (30fps visual, full-speed logic)
-            if (window.tizen) {
-                setFrameskip(1);
-            }
-        } catch(e) {
-            console.error('Failed to start SNES emulation:', e);
-        }
+            // Frameskip: auto (0xFFFFFFFF) lets snes9x decide based on performance
+            if (Module._set_frameskip) Module._set_frameskip(0xFFFFFFFF);
+        } catch(e) {}
     }
 
     function pause() {
