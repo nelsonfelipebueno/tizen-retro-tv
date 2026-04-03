@@ -1,0 +1,7 @@
+{
+  "program": {
+    "arm": {
+      "url": "snes9x_arm.nexe"
+    }
+  }
+}

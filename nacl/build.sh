@@ -13,7 +13,16 @@ cd /src/snes4nacl
 rm -f *.pexe *.nexe
 
 # Exclude files we don't need (reduce build issues + binary size)
-EXCLUDE="loadzip|movie|netplay|server|logger|screenshot"
+# movie/netplay/server = unused features
+# spc7110dec = standalone file with missing headers
+# bsx = Satellaview (not needed)
+# seta = SETA chip (rare games only)
+# Inline-included .cpp files (compiled via #include from their parent):
+# cpuops.cpp (by sa1cpu.cpp), spc7110emu/dec (by spc7110.cpp), srtcemu (by srtc.cpp)
+# Also exclude unused features: movie, netplay, server, logger, screenshot
+# cpuops is compiled standalone AND included inline by sa1cpu.cpp (guarded by ifdef)
+# spc7110emu/dec, srtcemu are inline-only
+EXCLUDE="loadzip|movie|netplay|server|logger|screenshot|spc7110dec|spc7110emu|srtcemu|bsx|seta"
 CORE_CPP=$(find . -maxdepth 1 -name "*.cpp" | grep -vE "$EXCLUDE" | sort | tr '\n' ' ')
 APU_CPP=$(find apu -name "*.cpp" | sort | tr '\n' ' ')
 NACL_CPP=$(find nacl -name "*.cpp" | sort | tr '\n' ' ')
