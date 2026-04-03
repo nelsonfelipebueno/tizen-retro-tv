@@ -175,28 +175,8 @@ var App = (function() {
     }
 
     function loadAndStartRom(rom) {
-        if (rom.bundled) {
-            RomLoader.loadBundledRom(rom, function(err, buffer, system) {
-                if (err) {
-                    UI.toast('Error: ' + err.message);
-                    setState('ROM_LIST');
-                    return;
-                }
-                startEmulator(buffer, rom.name);
-            });
-        } else if (window.tizen) {
-            RomLoader.loadRomTizen(rom, function(err, buffer, system) {
-                if (err) {
-                    UI.toast('Error: ' + err.message);
-                    setState('ROM_LIST');
-                    return;
-                }
-                startEmulator(buffer, rom.name);
-            });
-        } else {
-            UI.toast('Use file picker in dev mode');
-            setState('ROM_LIST');
-        }
+        // Launch webretro directly — it handles everything (rendering, audio, gamepad, save states)
+        EmulatorSNES.launch(rom.path);
     }
 
     function startEmulator(romBuffer, name) {
