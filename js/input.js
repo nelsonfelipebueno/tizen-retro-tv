@@ -280,20 +280,21 @@ var Input = (function() {
             var inGame = !!callbacks.game;
             if (!prev.pauseCombo) prev.pauseCombo = false;
 
-            // PAUSE: Start(9), Menu/Guide(16,17) — checked FIRST
+            // PAUSE: Menu/Guide(16,17) or Select+Start combo — NOT Start alone
             var startNow = gp.buttons[9] && gp.buttons[9].pressed;
+            var selectNow = gp.buttons[8] && gp.buttons[8].pressed;
             var menuNow = (gp.buttons[16] && gp.buttons[16].pressed) ||
                           (gp.buttons[17] && gp.buttons[17].pressed);
-            var pauseNow = startNow || menuNow;
+            var pauseNow = menuNow || (startNow && selectNow);
             if (pauseNow && !prev.pauseCombo) {
                 if (callbacks.pause) callbacks.pause();
                 else if (callbacks.menu) callbacks.menu('back');
             }
             prev.pauseCombo = pauseNow;
 
-            // BUTTONS (skip 9=Start, 16,17=Menu — handled above as pause)
+            // BUTTONS (skip 16,17=Menu — handled above as pause. Start=9 goes to game)
             for (var bi = 0; bi < gp.buttons.length; bi++) {
-                if (bi === 9 || bi === 16 || bi === 17) continue;
+                if (bi === 16 || bi === 17) continue;
 
                 var pressed = gp.buttons[bi].pressed;
                 var wasPressed = prev.buttons[bi] || false;
