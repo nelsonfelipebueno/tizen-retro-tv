@@ -9,8 +9,11 @@ var RomLoader = (function() {
         // SNES
         { name: 'Super Mario World (US)', fullName: 'smw.smc', path: 'roms/smw.smc', system: 'snes', bundled: true },
         { name: 'Super Mario World (PT-BR)', fullName: 'smw-ptbr.sfc', path: 'roms/smw-ptbr.sfc', system: 'snes', bundled: true },
-        { name: 'SMW All-Stars + SMW', fullName: 'smw-allstars.sfc', path: 'roms/smw-allstars.sfc', system: 'snes', bundled: true }
-        // NES — add .nes ROMs to roms/ folder and list here
+        { name: 'SMW All-Stars + SMW', fullName: 'smw-allstars.sfc', path: 'roms/smw-allstars.sfc', system: 'snes', bundled: true },
+        // NES
+        { name: 'Super Mario Bros (PT-BR)', fullName: 'smb-ptbr.nes', path: 'roms/smb-ptbr.nes', system: 'nes', bundled: true },
+        { name: 'Super Mario Bros (PT-BR Patched)', fullName: 'smb-ptbr-patched.nes', path: 'roms/smb-ptbr-patched.nes', system: 'nes', bundled: true },
+        { name: 'Super Mario Bros 3 (PT-BR)', fullName: 'smb3-ptbr.nes', path: 'roms/smb3-ptbr.nes', system: 'nes', bundled: true }
     ];
 
     var USB_PATHS = [
