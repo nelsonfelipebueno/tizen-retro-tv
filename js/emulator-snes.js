@@ -2,10 +2,10 @@ var EmulatorSNES = (function() {
     'use strict';
 
     function launch(romPath) {
-        // webretro supports ?core=X&rom=URL
-        // ROM path is relative to webretro/index.html, so go up 2 dirs
+        // snes9x-2005-wasm: 604KB WASM, designed for PSP hardware
+        // ROM path relative to snes9x2005/index.html
         var relPath = '../../' + romPath;
-        window.location.href = 'lib/webretro/index.html?core=snes9x&rom=' + encodeURIComponent(relPath);
+        window.location.href = 'lib/snes9x2005/index.html?rom=' + encodeURIComponent(relPath);
     }
 
     return {
