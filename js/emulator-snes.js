@@ -91,8 +91,8 @@ var EmulatorSNES = (function() {
         try {
             Module._run();
             isRunning = true;
-            // Frameskip 2 = render every 3rd frame, more CPU for game logic
-            if (Module._set_frameskip) Module._set_frameskip(2);
+            // No frameskip — let the engine run naturally
+            if (Module._set_frameskip) Module._set_frameskip(0);
         } catch(e) {}
     }
 

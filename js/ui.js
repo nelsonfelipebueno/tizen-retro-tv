@@ -146,8 +146,9 @@ var UI = (function() {
     }
 
     function resizeCanvas(canvas, nativeWidth, nativeHeight) {
-        var windowW = window.innerWidth;
-        var windowH = window.innerHeight;
+        // Cap at 1080p to avoid 4K upscale overhead on TV GPU
+        var windowW = Math.min(window.innerWidth, 1920);
+        var windowH = Math.min(window.innerHeight, 1080);
         var aspectRatio = nativeWidth / nativeHeight;
         var canvasW, canvasH;
 
