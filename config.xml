@@ -3,24 +3,25 @@
         xmlns:tizen="http://tizen.org/ns/widgets"
         id="http://retrotv.app/TizenRetroTV"
         version="1.0.0"
-        viewmodes="maximized">
+        viewmodes="maximized"
+        width="1920" height="1080">
     <access origin="*" subdomains="true"/>
     <tizen:application id="xR3tr0TvAp.TizenRetroTV"
                        package="xR3tr0TvAp"
                        required_version="3.0"/>
     <content src="index.html"/>
+    <tizen:content-security-policy>*</tizen:content-security-policy>
     <name>Retro TV</name>
     <icon src="assets/icons/icon-117.png"/>
+    <tizen:privilege name="http://tizen.org/privilege/internet"/>
     <tizen:privilege name="http://tizen.org/privilege/filesystem.read"/>
     <tizen:privilege name="http://tizen.org/privilege/filesystem.write"/>
     <tizen:privilege name="http://tizen.org/privilege/externalstorage"/>
     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
     <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
     <feature name="http://tizen.org/feature/screen.size.all"/>
-    <tizen:profile name="tv-samsung"/>
-    <!-- Force 1080p rendering instead of 4K -->
-    <tizen:metadata key="http://samsung.com/tv/metadata/resolution" value="1920x1080"/>
-    <!-- Disable multitasking — TV dedicates all resources to this app -->
+    <tizen:profile name="tv"/>
     <tizen:metadata key="http://samsung.com/tv/metadata/multitasking.support" value="false"/>
+    <tizen:metadata key="http://samsung.com/tv/metadata/multiscreen.support" value="true"/>
     <tizen:setting screen-orientation="landscape" context-menu="enable" background-support="enable" encryption="disable" install-location="auto" hwkey-event="enable"/>
 </widget>
