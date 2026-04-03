@@ -11,42 +11,7 @@ var EmulatorSNES = (function() {
         canvas.width = 256;
         canvas.height = 224;
 
-        // === PERFORMANCE: Kill audio BEFORE Emscripten loads ===
-        // SDL audio is the biggest CPU drain on TV hardware.
-        // Stub AudioContext so Emscripten SDL gets silence with zero CPU cost.
-        var Noop = function() { return this; };
-        var NoopPromise = function() { return { then: Noop, catch: Noop }; };
-        var FakeCtx = function() {
-            this.sampleRate = 22050;
-            this.state = 'running';
-            this.destination = {};
-            this.currentTime = 0;
-        };
-        FakeCtx.prototype.createScriptProcessor = function() {
-            return { connect: Noop, disconnect: Noop, onaudioprocess: null, bufferSize: 4096 };
-        };
-        FakeCtx.prototype.createGain = function() {
-            return { connect: Noop, gain: { value: 0, setValueAtTime: Noop } };
-        };
-        FakeCtx.prototype.createOscillator = function() {
-            return { connect: Noop, start: Noop, stop: Noop, frequency: { value: 0 } };
-        };
-        FakeCtx.prototype.createBuffer = function(ch, len, rate) {
-            var b = [];
-            for (var i = 0; i < ch; i++) b.push(new Float32Array(len));
-            return { getChannelData: function(c) { return b[c]; }, numberOfChannels: ch, length: len, sampleRate: rate };
-        };
-        FakeCtx.prototype.createBufferSource = function() {
-            return { connect: Noop, start: Noop, stop: Noop, buffer: null };
-        };
-        FakeCtx.prototype.resume = NoopPromise;
-        FakeCtx.prototype.suspend = NoopPromise;
-        FakeCtx.prototype.close = NoopPromise;
-        FakeCtx.prototype.decodeAudioData = function(buf, ok) { if (ok) ok(this.createBuffer(2, 1, 22050)); };
-        window.AudioContext = FakeCtx;
-        window.webkitAudioContext = FakeCtx;
-
-        // Configure Emscripten Module
+        // Configure Emscripten Module — audio stays enabled (needed for timing)
         window.Module = {
             canvas: canvas,
             memoryInitializerPrefixURL: 'lib/xnes/',
@@ -101,8 +66,8 @@ var EmulatorSNES = (function() {
         try {
             Module._run();
             isRunning = true;
-            // Frameskip: auto (0xFFFFFFFF) lets snes9x decide based on performance
-            if (Module._set_frameskip) Module._set_frameskip(0xFFFFFFFF);
+            // Frameskip 1 = skip every other frame (renders at 30fps, logic at 60fps)
+            if (Module._set_frameskip) Module._set_frameskip(1);
         } catch(e) {}
     }
 
