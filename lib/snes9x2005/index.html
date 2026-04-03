@@ -32,6 +32,11 @@
       transform: translateZ(0);
       -webkit-transform: translateZ(0);
       will-change: transform;
+      /* CSS scales 256x224 canvas to fill screen — GPU does the upscale, not CPU */
+      width: 100vw;
+      height: calc(100vw * 0.875);
+      max-height: 100vh;
+      max-width: calc(100vh / 0.875);
     }
   </style>
 </head>
