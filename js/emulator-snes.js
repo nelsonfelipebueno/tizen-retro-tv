@@ -28,24 +28,39 @@ var EmulatorSNES = (function() {
         container.appendChild(embed);
         naclModule = embed;
 
+        UI.toast('NaCl: loading module...', 10000);
+
+        naclModule.addEventListener('loadstart', function() {
+            UI.toast('NaCl: download started...', 10000);
+        });
+
+        naclModule.addEventListener('progress', function(e) {
+            if (e.lengthComputable) {
+                var pct = Math.round(e.loaded / e.total * 100);
+                UI.toast('NaCl: ' + pct + '%', 10000);
+            }
+        });
+
         naclModule.addEventListener('load', function() {
+            UI.toast('NaCl: module loaded, initializing...', 10000);
             isLoaded = true;
             naclModule.postMessage('init');
         });
 
         naclModule.addEventListener('message', function(e) {
             var data = String(e.data);
-            if (data === 'initFinished') {
+            UI.toast('NaCl msg: ' + data.substring(0, 50), 5000);
+            if (data === 'initFinished' || data.indexOf('initFinished') !== -1) {
                 if (onReadyCallback) onReadyCallback();
             }
         });
 
         naclModule.addEventListener('error', function() {
-            UI.toast('NaCl failed to load');
+            UI.toast('NaCl ERROR: module failed to load', 10000);
         });
 
         naclModule.addEventListener('crash', function() {
-            UI.toast('Emulator crashed');
+            UI.toast('NaCl CRASH: module crashed', 10000);
         });
     }
 
