@@ -11,7 +11,32 @@ var EmulatorSNES = (function() {
         canvas.width = 256;
         canvas.height = 224;
 
-        // Configure Emscripten Module — audio stays enabled (needed for timing)
+        // PERFORMANCE: Intercept AudioContext to mute output but keep timing alive
+        // Emscripten SDL needs onaudioprocess callbacks for its clock,
+        // but we redirect audio to a zero-gain node (no speaker output, less CPU)
+        var OrigAC = window.AudioContext || window.webkitAudioContext;
+        if (OrigAC) {
+            var MutedAC = function() {
+                var ctx = new OrigAC();
+                var origCreateScriptProcessor = ctx.createScriptProcessor.bind(ctx);
+                ctx.createScriptProcessor = function(bufSize, inCh, outCh) {
+                    var node = origCreateScriptProcessor(bufSize, inCh, outCh);
+                    var origConnect = node.connect.bind(node);
+                    // Override connect: route through a zero-gain node (muted)
+                    node.connect = function(dest) {
+                        var gain = ctx.createGain();
+                        gain.gain.value = 0;
+                        origConnect(gain);
+                        gain.connect(dest);
+                    };
+                    return node;
+                };
+                return ctx;
+            };
+            window.AudioContext = MutedAC;
+            window.webkitAudioContext = MutedAC;
+        }
+
         window.Module = {
             canvas: canvas,
             memoryInitializerPrefixURL: 'lib/xnes/',
