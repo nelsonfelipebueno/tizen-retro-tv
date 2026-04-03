@@ -18,7 +18,9 @@
     <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
     <feature name="http://tizen.org/feature/screen.size.all"/>
     <tizen:profile name="tv-samsung"/>
-    <!-- Force 1080p rendering instead of 4K — huge performance gain -->
+    <!-- Force 1080p rendering instead of 4K -->
     <tizen:metadata key="http://samsung.com/tv/metadata/resolution" value="1920x1080"/>
+    <!-- Disable multitasking — TV dedicates all resources to this app -->
+    <tizen:metadata key="http://samsung.com/tv/metadata/multitasking.support" value="false"/>
     <tizen:setting screen-orientation="landscape" context-menu="enable" background-support="enable" encryption="disable" install-location="auto" hwkey-event="enable"/>
 </widget>

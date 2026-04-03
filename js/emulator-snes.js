@@ -91,8 +91,12 @@ var EmulatorSNES = (function() {
         try {
             Module._run();
             isRunning = true;
-            // Frameskip 0 = no skip, render every frame
-            if (Module._set_frameskip) Module._set_frameskip(0);
+            // Cap at 30fps — reduces CPU load by half
+            if (Module.setMainLoopTimingMode) {
+                Module.setMainLoopTimingMode(0, 1000/30);
+            }
+            // Frameskip 1 = render every other frame (matches 30fps cap)
+            if (Module._set_frameskip) Module._set_frameskip(1);
         } catch(e) {}
     }
 
