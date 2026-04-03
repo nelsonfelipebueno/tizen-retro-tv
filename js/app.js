@@ -74,14 +74,27 @@ var App = (function() {
 
             case 'PLAYING':
                 UI.showScreen('game');
-                Input.setMenuCallback(handleGameMenuInput);
+                Input.setMenuCallback(null);
                 Input.setGameCallback(handleGameInput);
+                Input.setPauseCallback(function() { pauseGame(); });
                 var nativeH = currentSystem === 'snes' ? 224 : 240;
                 UI.resizeCanvas(canvas, 256, nativeH);
+                canvas.setAttribute('tabindex', '0');
+                canvas.focus();
+                // Resume AudioContext (needs user gesture on Tizen)
+                try {
+                    var ac = window.AudioContext || window.webkitAudioContext;
+                    if (ac && ac.prototype && ac.prototype.resume) {
+                        var ctx = new ac();
+                        ctx.resume();
+                    }
+                } catch(e) {}
                 break;
 
             case 'PAUSED':
                 UI.showPause();
+                Input.setGameCallback(null);
+                Input.setPauseCallback(null);
                 Input.setMenuCallback(handlePauseInput);
                 if (currentSystem === 'nes') {
                     var slots = SaveManager.getSlotInfo(currentRom.name);

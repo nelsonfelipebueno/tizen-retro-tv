@@ -39,7 +39,7 @@ var Input = (function() {
     };
 
     var keyMap = {};
-    var callbacks = { menu: null, game: null };
+    var callbacks = { menu: null, game: null, pause: null };
     var gamepadPollInterval = null;
     var prevGamepadState = {};
 
@@ -138,6 +138,10 @@ var Input = (function() {
         callbacks.game = cb;
     }
 
+    function setPauseCallback(cb) {
+        callbacks.pause = cb;
+    }
+
     function dispatchSnesKey(snesButton, pressed) {
         var keyValue = snesKeyMap[snesButton];
         if (!keyValue) return;
@@ -184,7 +188,8 @@ var Input = (function() {
             var button = keyMap[e.key];
             if (!button) {
                 if (e.key === 'Escape' || e.key === 'Backspace') {
-                    if (callbacks.menu) callbacks.menu('back');
+                    if (callbacks.pause) callbacks.pause();
+                    else if (callbacks.menu) callbacks.menu('back');
                     e.preventDefault();
                     return;
                 }
@@ -272,78 +277,64 @@ var Input = (function() {
             if (!prevGamepadState[id]) prevGamepadState[id] = { buttons: {}, axes: {} };
             var prev = prevGamepadState[id];
 
-            // During gameplay: buttons go ONLY to game callback
-            // During menus: buttons go ONLY to menu callback
-            // Start+Select combo always triggers pause (via menu 'back')
             var inGame = !!callbacks.game;
+            if (!prev.pauseCombo) prev.pauseCombo = false;
 
+            // PAUSE: Start(9), Menu/Guide(16,17) — checked FIRST
+            var startNow = gp.buttons[9] && gp.buttons[9].pressed;
+            var menuNow = (gp.buttons[16] && gp.buttons[16].pressed) ||
+                          (gp.buttons[17] && gp.buttons[17].pressed);
+            var pauseNow = startNow || menuNow;
+            if (pauseNow && !prev.pauseCombo) {
+                if (callbacks.pause) callbacks.pause();
+                else if (callbacks.menu) callbacks.menu('back');
+            }
+            prev.pauseCombo = pauseNow;
+
+            // BUTTONS (skip 9=Start, 16,17=Menu — handled above as pause)
             for (var bi = 0; bi < gp.buttons.length; bi++) {
+                if (bi === 9 || bi === 16 || bi === 17) continue;
+
                 var pressed = gp.buttons[bi].pressed;
                 var wasPressed = prev.buttons[bi] || false;
+                if (pressed === wasPressed) continue;
+                prev.buttons[bi] = pressed;
 
-                if (pressed !== wasPressed) {
-                    prev.buttons[bi] = pressed;
-                    var button = activeGamepadMap[bi];
-                    if (button) {
-                        if (inGame) {
-                            // During gameplay: send to game only
-                            callbacks.game(button, pressed);
-                        } else if (pressed && callbacks.menu) {
-                            // During menus: send to menu only
-                            if (button === BUTTONS.A || button === BUTTONS.START) callbacks.menu('enter');
-                            else if (button === BUTTONS.B) callbacks.menu('back');
-                            else if (button === BUTTONS.UP) callbacks.menu('up');
-                            else if (button === BUTTONS.DOWN) callbacks.menu('down');
-                            else if (button === BUTTONS.LEFT) callbacks.menu('left');
-                            else if (button === BUTTONS.RIGHT) callbacks.menu('right');
-                        }
+                var button = activeGamepadMap[bi];
+                if (!button) continue;
+
+                if (inGame) {
+                    callbacks.game(button, pressed);
+                } else if (pressed && callbacks.menu) {
+                    if (button === BUTTONS.A) callbacks.menu('enter');
+                    else if (button === BUTTONS.B) callbacks.menu('back');
+                    else if (button === BUTTONS.UP) callbacks.menu('up');
+                    else if (button === BUTTONS.DOWN) callbacks.menu('down');
+                    else if (button === BUTTONS.LEFT) callbacks.menu('left');
+                    else if (button === BUTTONS.RIGHT) callbacks.menu('right');
+                }
+            }
+
+            // AXES (analog stick)
+            if (gp.axes.length >= 2) {
+                var threshold = 0.5;
+                var dirs = [
+                    ['left', BUTTONS.LEFT, gp.axes[0] < -threshold],
+                    ['right', BUTTONS.RIGHT, gp.axes[0] > threshold],
+                    ['up', BUTTONS.UP, gp.axes[1] < -threshold],
+                    ['down', BUTTONS.DOWN, gp.axes[1] > threshold]
+                ];
+                for (var di = 0; di < dirs.length; di++) {
+                    var dir = dirs[di][0];
+                    var btn = dirs[di][1];
+                    var active = dirs[di][2];
+                    if (active !== (prev.axes[dir] || false)) {
+                        prev.axes[dir] = active;
+                        if (inGame) callbacks.game(btn, active);
+                        else if (active && callbacks.menu) callbacks.menu(dir);
                     }
                 }
             }
-
-            if (gp.axes.length >= 2) {
-                var axisX = gp.axes[0];
-                var axisY = gp.axes[1];
-                var threshold = 0.5;
-
-                var left = axisX < -threshold;
-                var right = axisX > threshold;
-                var up = axisY < -threshold;
-                var down = axisY > threshold;
-
-                if (left !== (prev.axes.left || false)) {
-                    prev.axes.left = left;
-                    if (inGame) callbacks.game(BUTTONS.LEFT, left);
-                    else if (left && callbacks.menu) callbacks.menu('left');
-                }
-                if (right !== (prev.axes.right || false)) {
-                    prev.axes.right = right;
-                    if (inGame) callbacks.game(BUTTONS.RIGHT, right);
-                    else if (right && callbacks.menu) callbacks.menu('right');
-                }
-                if (up !== (prev.axes.up || false)) {
-                    prev.axes.up = up;
-                    if (inGame) callbacks.game(BUTTONS.UP, up);
-                    else if (up && callbacks.menu) callbacks.menu('up');
-                }
-                if (down !== (prev.axes.down || false)) {
-                    prev.axes.down = down;
-                    if (inGame) callbacks.game(BUTTONS.DOWN, down);
-                    else if (down && callbacks.menu) callbacks.menu('down');
-                }
-            }
-
-            // Pause triggers: Start+Select combo OR Menu/Guide button (16/17)
-            var startPressed = gp.buttons[9] && gp.buttons[9].pressed;
-            var selectPressed = gp.buttons[8] && gp.buttons[8].pressed;
-            var combo = startPressed && selectPressed;
-            var menuBtn = (gp.buttons[16] && gp.buttons[16].pressed) ||
-                          (gp.buttons[17] && gp.buttons[17].pressed);
-            var pauseTrigger = combo || menuBtn;
-            if (pauseTrigger && !prev.pauseCombo) {
-                if (callbacks.menu) callbacks.menu('back');
-            }
-            prev.pauseCombo = pauseTrigger;
         }
     }
 
@@ -354,6 +345,7 @@ var Input = (function() {
         setGameCallback: setGameCallback,
         dispatchSnesKey: dispatchSnesKey,
         snesKeyMap: snesKeyMap,
+        setPauseCallback: setPauseCallback,
         loadKeyMap: loadKeyMap,
         saveKeyMap: saveKeyMap,
         stopGamepadPolling: stopGamepadPolling

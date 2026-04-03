@@ -66,8 +66,8 @@ var EmulatorSNES = (function() {
         try {
             Module._run();
             isRunning = true;
-            // Frameskip 1 = skip every other frame (renders at 30fps, logic at 60fps)
-            if (Module._set_frameskip) Module._set_frameskip(1);
+            // Frameskip 2 = render every 3rd frame, more CPU for game logic
+            if (Module._set_frameskip) Module._set_frameskip(2);
         } catch(e) {}
     }
 
