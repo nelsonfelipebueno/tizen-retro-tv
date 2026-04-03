@@ -49,28 +49,19 @@ var EmulatorSNES = (function() {
         });
     }
 
-    function loadROM(arrayBuffer) {
+    function loadROM(romPath) {
         if (!isLoaded) return;
 
-        // NaCl URLLoader can't handle blob URLs.
-        // Instead, send ROM data directly via postMessage as ArrayBuffer.
-        // snes4nacl uses downloadThenLoadRom with URL, but we need to
-        // write to virtual FS via postMessage.
-        // For now, use a data: URL which URLLoader CAN fetch.
-        var bytes = new Uint8Array(arrayBuffer);
-        var binary = '';
-        for (var i = 0; i < bytes.length; i++) {
-            binary += String.fromCharCode(bytes[i]);
-        }
-        var b64 = btoa(binary);
-        var dataUrl = 'data:application/octet-stream;base64,' + b64;
-        naclModule.postMessage('downloadThenLoadRom url:' + dataUrl);
+        // NaCl URLLoader fetches ROMs via HTTP.
+        // For bundled ROMs, the path is relative to the .wgt root (e.g. "roms/smw.smc")
+        // The Tizen web engine serves .wgt files internally via HTTP-like protocol
+        naclModule.postMessage('downloadThenLoadRom url:' + romPath);
 
-        // Start frame loop after a short delay for ROM loading
+        // Start frame loop after delay for ROM loading
         setTimeout(function() {
             naclModule.postMessage('play');
             startFrameLoop();
-        }, 2000);
+        }, 3000);
     }
 
     function startFrameLoop() {

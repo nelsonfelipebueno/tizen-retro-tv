@@ -165,10 +165,8 @@ var App = (function() {
 
     function loadAndStartRom(rom) {
         if (currentSystem === 'snes') {
-            // SNES: load ROM then launch NaCl
-            loadRomBuffer(rom, function(buffer) {
-                startSNES(buffer, rom.name);
-            });
+            // SNES NaCl: pass ROM path directly — NaCl URLLoader fetches it
+            startSNES(rom.path, rom.name);
             return;
         }
 
@@ -215,14 +213,14 @@ var App = (function() {
         }
     }
 
-    function startSNES(romBuffer, name) {
+    function startSNES(romPath, name) {
         var naclContainer = document.getElementById('nacl-container');
         canvas.style.display = 'none';
         naclContainer.style.display = 'block';
         snesJoypad = 0;
 
         EmulatorSNES.init(naclContainer, function() {
-            EmulatorSNES.loadROM(romBuffer);
+            EmulatorSNES.loadROM(romPath);
             setState('PLAYING');
         });
     }
