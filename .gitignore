@@ -2,3 +2,5 @@ dist/
 *.DS_Store
 __MACOSX/
 node_modules/
+nacl/sdk/
+nacl/snes4nacl/.git/
