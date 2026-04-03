@@ -12,7 +12,9 @@ cd /src/snes4nacl
 
 rm -f *.pexe *.nexe
 
-CORE_CPP=$(find . -maxdepth 1 -name "*.cpp" | sort | tr '\n' ' ')
+# Exclude files we don't need (reduce build issues + binary size)
+EXCLUDE="loadzip|movie|netplay|server|logger|screenshot"
+CORE_CPP=$(find . -maxdepth 1 -name "*.cpp" | grep -vE "$EXCLUDE" | sort | tr '\n' ' ')
 APU_CPP=$(find apu -name "*.cpp" | sort | tr '\n' ' ')
 NACL_CPP=$(find nacl -name "*.cpp" | sort | tr '\n' ' ')
 
@@ -25,10 +27,11 @@ $TOOLCHAIN/pnacl-clang++ \
     -I. -Iapu -Inacl \
     -DHAVE_STRINGS_H -DHAVE_STDINT_H -DRIGHTSHIFT_IS_SAR \
     -DVAR_CYCLES -DCPU_SHUTDOWN -DSPC700_SHUTDOWN \
-    -DCORRECT_VRAM_READS -DUNZIP_SUPPORT \
+    -DCORRECT_VRAM_READS \
+    -include nacl/nacl_compat.h \
     -DNOASM -DPIXEL_FORMAT=RGB565 \
     -DUSE_OPENGL -DNACL \
-    -std=gnu++98 \
+    -std=c++11 \
     -O2 \
     -o snes4nacl.pexe \
     $CORE_CPP $APU_CPP $NACL_CPP \
