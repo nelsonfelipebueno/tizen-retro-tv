@@ -91,8 +91,6 @@ var EmulatorSNES = (function() {
         try {
             Module._run();
             isRunning = true;
-            // Disable transparency compositing (saves significant CPU)
-            if (Module._set_transparency) Module._set_transparency(0);
             // Frameskip 0 = no skip, render every frame
             if (Module._set_frameskip) Module._set_frameskip(0);
         } catch(e) {}
